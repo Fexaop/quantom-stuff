@@ -1,0 +1,4 @@
+venv*/
+qubit_matrix.npy
+__pycache__/**/*
+/.venv-tf311
