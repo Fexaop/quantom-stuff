@@ -2,3 +2,6 @@ venv*/
 qubit_matrix.npy
 __pycache__/**/*
 /.venv-tf311
+qsym/cirq_tensorflow_mnist_0_9_model.keras
+qsym/cirq_tensorflow_mnist_0_9_history.png
+qsym/cirq_tensorflow_mnist_0_9_artifacts.pkl

@@ -303,9 +303,7 @@ def save_training_plot(history: List[Dict[str, float]], plot_path: Path) -> None
 
 
 def train_model(args) -> Dict:
-    print("=" * 80)
     print("Quantum Handwritten Digit Training")
-    print("=" * 80)
 
     dataset = load_handwritten_dataset(
         source=args.dataset,
@@ -333,7 +331,7 @@ def train_model(args) -> Dict:
     y_train = dataset.y_train
     y_test = dataset.y_test
 
-    qnode = build_quantum_qnode(n_qubits=n_qubits, n_layers=args.n_layers)
+    qnode = build_quantum_qnode(n_qubits=41, n_layers=6)
     q_feature_dim = 2 ** n_qubits
 
     rng = np.random.default_rng(args.seed)
@@ -699,7 +697,7 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs.")
     parser.add_argument("--batch-size", type=int, default=24, help="Mini-batch size.")
     parser.add_argument("--n-qubits", type=int, default=6, help="Number of qubits/features used by the quantum circuit.")
-    parser.add_argument("--n-layers", type=int, default=3, help="Number of variational circuit layers.")
+    parser.add_argument("--n-layers", type=int, default=5, help="Number of variational circuit layers.")
     parser.add_argument("--hidden-dim", type=int, default=48, help="Hidden layer size in the classical head.")
     parser.add_argument("--learning-rate", type=float, default=0.02, help="Optimizer learning rate.")
     parser.add_argument("--max-samples", type=int, default=2000, help="Max samples to use for training/testing (0 means full dataset).")

@@ -290,9 +290,7 @@ def save_history_plot(history: tf.keras.callbacks.History, plot_path: Path) -> N
 
 
 def train_model(args) -> Dict:
-    print("=" * 80)
     print("TensorFlow + Cirq MNIST (0-9) Training")
-    print("=" * 80)
 
     tf.keras.utils.set_random_seed(args.seed)
     np.random.seed(args.seed)
@@ -570,7 +568,7 @@ def parse_args():
     parser.add_argument("--batch-size", type=int, default=128, help="Mini-batch size.")
     parser.add_argument("--learning-rate", type=float, default=0.001, help="Learning rate.")
 
-    parser.add_argument("--n-qubits", type=int, default=10, help="Number of qubits for Cirq feature branch.")
+    parser.add_argument("--n-qubits", type=int, default=15, help="Number of qubits for Cirq feature branch.")
     parser.add_argument("--cirq-layers", type=int, default=4, help="Number of Cirq encoding layers.")
 
     parser.add_argument(

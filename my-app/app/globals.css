@@ -1,26 +1,116 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #07080f;
+  --foreground: #f9faff;
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* Bold cosmic violet palette */
+  --color-cosmic-50: #f4edff;
+  --color-cosmic-100: #e9dbff;
+  --color-cosmic-200: #d5b4ff;
+  --color-cosmic-300: #bc82ff;
+  --color-cosmic-400: #a358ff;
+  --color-cosmic-500: #8a2eff;
+  --color-cosmic-600: #7321df;
+  --color-cosmic-700: #5b1cae;
+  --color-cosmic-800: #44167f;
+  --color-cosmic-900: #2f1058;
+  --color-cosmic-950: #120628;
+
+  /* Bold magenta-pink palette */
+  --color-nebula-50: #fff0fb;
+  --color-nebula-100: #ffd9f3;
+  --color-nebula-200: #ffb0e6;
+  --color-nebula-300: #ff7ad6;
+  --color-nebula-400: #ff43c5;
+  --color-nebula-500: #f620b0;
+  --color-nebula-600: #cf1291;
+  --color-nebula-700: #a20f71;
+  --color-nebula-800: #760b52;
+  --color-nebula-900: #4e0836;
+  --color-nebula-950: #240317;
+
+  /* Electric cyan-blue palette */
+  --color-starlight-50: #ecfaff;
+  --color-starlight-100: #cff4ff;
+  --color-starlight-200: #9de9ff;
+  --color-starlight-300: #63dbff;
+  --color-starlight-400: #24cbff;
+  --color-starlight-500: #00b4f5;
+  --color-starlight-600: #0090c8;
+  --color-starlight-700: #00709e;
+  --color-starlight-800: #05577a;
+  --color-starlight-900: #0a3d56;
+  --color-starlight-950: #051d2b;
+
+  /* Bold amber highlights */
+  --color-solar-50: #fff8e8;
+  --color-solar-100: #ffefc7;
+  --color-solar-200: #ffe08f;
+  --color-solar-300: #ffd052;
+  --color-solar-400: #ffbb1f;
+  --color-solar-500: #f89b08;
+  --color-solar-600: #d47805;
+  --color-solar-700: #a85a09;
+  --color-solar-800: #87470f;
+  --color-solar-900: #6f3b12;
+  --color-solar-950: #3f1f08;
+
+  /* Bold mint highlights */
+  --color-aurora-50: #eafff7;
+  --color-aurora-100: #cbffec;
+  --color-aurora-200: #98ffd8;
+  --color-aurora-300: #5af5ba;
+  --color-aurora-400: #28df9d;
+  --color-aurora-500: #0fbe83;
+  --color-aurora-600: #079968;
+  --color-aurora-700: #0b7855;
+  --color-aurora-800: #0d5e45;
+  --color-aurora-900: #0d4d3a;
+  --color-aurora-950: #052d22;
+
+  /* Semantic aliases for section-level theming */
+  --color-card: #261a44;
+  --color-card-foreground: #f4edff;
+  --color-muted: #4a3e74;
+  --color-muted-foreground: #c8b5f8;
+  --color-border: #5a4694;
+  --color-ring: #c09bff;
+
+  --font-sans: var(--font-space-grotesk);
+  --font-display: var(--font-sora);
+  --font-mono: var(--font-space-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
+  background: #07080f;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-space-grotesk), "Avenir Next", "Segoe UI", sans-serif;
 }
+
+.animate-fade-up {
+  animation: fade-up 750ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
