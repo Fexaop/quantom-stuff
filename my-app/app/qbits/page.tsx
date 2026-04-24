@@ -88,12 +88,6 @@ export default function QbitsPage() {
             qubit layers, and the hybrid quantum training flow.
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs uppercase tracking-[0.12em]">
-            <span className="rounded-full border border-cosmic-300/70 bg-cosmic-500/35 px-3 py-1 text-cosmic-50">Violet Core</span>
-            <span className="rounded-full border border-nebula-300/70 bg-nebula-500/35 px-3 py-1 text-nebula-50">Magenta Gates</span>
-            <span className="rounded-full border border-starlight-300/70 bg-starlight-500/35 px-3 py-1 text-starlight-50">Cyan Signals</span>
-            <span className="rounded-full border border-solar-300/70 bg-solar-500/35 px-3 py-1 text-solar-50">Amber Outputs</span>
-          </div>
 
           <div className="mt-8 flex items-center justify-center gap-3">
             <Link

@@ -183,6 +183,82 @@ const HYBRID_LOSS = [1.8, 1.46, 1.18, 0.96, 0.8, 0.68, 0.58, 0.5, 0.45, 0.41];
 const CLASSICAL_ACC = [58, 66, 73, 79, 83, 86, 88, 90, 91, 92];
 const HYBRID_ACC = [58, 69, 77, 83, 87, 90, 92, 94, 95, 96];
 
+const COIN_TOSS_MIN = 100;
+const COIN_TOSS_MAX = 10000;
+
+const MNIST_PIPELINE_STEPS = [
+  {
+    name: "Step 1: Setup + device check",
+    functions: "parse_args(), configure_tensorflow_gpu()",
+    baby: "First we choose the knobs, then we ask TensorFlow: do we have a GPU or should we use CPU?",
+    io: "CLI flags -> tf_device string (/GPU:0 or /CPU:0)",
+  },
+  {
+    name: "Step 2: Load and split MNIST",
+    functions: "load_mnist_0_9()",
+    baby: "We open the digit pictures, normalize pixels to 0..1, then split into train/valid/test groups.",
+    io: "Raw MNIST -> DatasetBundle with x/y train, valid, test",
+  },
+  {
+    name: "Step 3: Make qubit-friendly features",
+    functions: "preprocess_for_cirq()",
+    baby: "We flatten images, compress with PCA, scale values into -pi..pi angles, and also make sign bits.",
+    io: "Image tensors -> angle vectors + binary vectors + PCA/scaler",
+  },
+  {
+    name: "Step 4: Run Cirq feature extractor",
+    functions: "CirqFeatureExtractor.transform()",
+    baby: "For each sample: optional X gates from bits, repeated RY rotations, CZ ring links, then expectation readout.",
+    io: "Angles/bits -> dense quantum feature vector",
+  },
+  {
+    name: "Step 5: Build two-branch model",
+    functions: "build_hybrid_model()",
+    baby: "One branch learns from pixels (CNN), one branch learns from quantum features, then both are merged.",
+    io: "image + cirq_features -> softmax probabilities for digits 0..9",
+  },
+  {
+    name: "Step 6: Train, validate, test",
+    functions: "train_model(), EpochLogger",
+    baby: "We fit epoch by epoch, print metrics, adjust learning rate when needed, then evaluate on test data.",
+    io: "Train/valid/test tensors -> trained model + history + test accuracy",
+  },
+  {
+    name: "Step 7: Save + interactive drawing",
+    functions: "model.save(), load_artifacts(), DigitDrawApp",
+    baby: "We save model/tools, then a canvas app lets you draw a digit and run the same hybrid prediction path.",
+    io: "Saved files + drawn digit -> predicted class + top probabilities",
+  },
+] as const;
+
+const SCRIPT_DEFAULTS = {
+  maxSamples: 20000,
+  qubits: 10,
+  cirqLayers: 4,
+  epochs: 20,
+  batchSize: 128,
+  targetAccuracy: 90,
+} as const;
+
+const OLED_BABY_STEPS = [
+  "Open image path and convert pixels to RGB array.",
+  "Pick a movable 10x10 window with get_grid_samples().",
+  "Turn each pixel into 3 qubits using create_qubit_circuit(r,g,b).",
+  "Compute statevector and binary label for all 100 pixels.",
+  "Use PixelInteractor to drag window, click pixels, and refresh Bloch/info panels.",
+  "Save matrix_states to qubit_matrix.npy for later analysis.",
+] as const;
+
+const COIN_BABY_STEPS = [
+  "hadamard_gate() creates equal amplitudes for |0> and |1>.",
+  "measure_qubit() squares amplitudes into probabilities.",
+  "toss_coin() repeats measurement num_tosses times.",
+  "get_statistics() counts heads/tails and percentages.",
+  "plot_results() draws bar + pie distribution charts.",
+  "plot_cumulative() shows running probability approaching 50/50.",
+  "main() runs 100, 1024, 10000 tosses and saves PNG reports.",
+] as const;
+
 const SLIDES = [
   {
     id: "classical",
@@ -203,6 +279,21 @@ const SLIDES = [
     id: "hybrid",
     title: "Hybrid Quantum + Classical Training Graphs",
     subtitle: "Track how quantum features improve optimization and accuracy.",
+  },
+  {
+    id: "tf-cirq-script",
+    title: "qsym/quantom_tensforflow_mnist.py",
+    subtitle: "Baby-step pipeline: data load, quantum encoding, hybrid training, save, and draw-and-predict.",
+  },
+  {
+    id: "oled-script",
+    title: "oled.py: Pixel-to-Qubit Analyzer",
+    subtitle: "Detailed walkthrough of the 10x10 RGB-to-qubit pipeline and interactive visual analyzer.",
+  },
+  {
+    id: "coin-toss-script",
+    title: "qsym/quantum_coin_toss.py",
+    subtitle: "Function-by-function breakdown of Hadamard, repeated measurement, stats, and plots.",
   },
 ] as const;
 
@@ -694,11 +785,438 @@ function HybridGraphDiagram({ epoch }: { epoch: number }) {
   );
 }
 
+function TensorflowCirqPipelineDiagram({ stage }: { stage: number }) {
+  const activeStage = Math.min(MNIST_PIPELINE_STEPS.length - 1, Math.max(0, stage));
+  const current = MNIST_PIPELINE_STEPS[activeStage];
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <svg
+        viewBox="0 0 430 330"
+        role="img"
+        aria-label="TensorFlow and Cirq pipeline from qsym/quantom_tensforflow_mnist.py"
+        className="h-auto w-full"
+      >
+        <defs>
+          <marker id="mnist-arrow-tip" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="rgba(189, 255, 227, 0.88)" />
+          </marker>
+        </defs>
+
+        {MNIST_PIPELINE_STEPS.map((entry, idx) => {
+          const y = 20 + idx * 42;
+          const isActive = idx === activeStage;
+
+          return (
+            <g key={entry.name}>
+              <rect
+                x={18}
+                y={y}
+                width={264}
+                height={34}
+                rx={10}
+                fill={isActive ? "rgba(163, 88, 255, 0.35)" : "rgba(7, 12, 25, 0.72)"}
+                stroke={isActive ? "rgba(233, 204, 255, 0.9)" : "rgba(206, 245, 255, 0.45)"}
+              />
+              <text x={30} y={y + 15} fill="rgba(247, 241, 255, 0.96)" fontSize={10} fontWeight={700}>
+                {`Step ${idx + 1}`}
+              </text>
+              <text x={30} y={y + 27} fill="rgba(247, 241, 255, 0.84)" fontSize={9}>
+                {entry.functions}
+              </text>
+            </g>
+          );
+        })}
+
+        {MNIST_PIPELINE_STEPS.slice(0, -1).map((_, idx) => {
+          const y1 = 20 + idx * 42 + 34;
+          const y2 = 20 + (idx + 1) * 42;
+          return (
+            <line
+              key={`flow-${idx}`}
+              x1={150}
+              y1={y1}
+              x2={150}
+              y2={y2}
+              stroke="rgba(189, 255, 227, 0.86)"
+              strokeWidth={1.6}
+              markerEnd="url(#mnist-arrow-tip)"
+            />
+          );
+        })}
+
+        <rect
+          x={298}
+          y={34}
+          width={114}
+          height={88}
+          rx={12}
+          fill="rgba(36, 203, 255, 0.24)"
+          stroke="rgba(206, 245, 255, 0.86)"
+        />
+        <text x={355} y={56} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={10}>
+          Train Path
+        </text>
+        <text x={355} y={74} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={9}>
+          model.fit(...)
+        </text>
+        <text x={355} y={90} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={9}>
+          model.evaluate(...)
+        </text>
+        <text x={355} y={106} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={9}>
+          save model + artifacts
+        </text>
+
+        <rect
+          x={298}
+          y={164}
+          width={114}
+          height={110}
+          rx={12}
+          fill="rgba(40, 223, 157, 0.18)"
+          stroke="rgba(189, 255, 227, 0.86)"
+        />
+        <text x={355} y={186} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={10}>
+          Draw Path
+        </text>
+        <text x={355} y={204} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={9}>
+          load_model(...)
+        </text>
+        <text x={355} y={220} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={9}>
+          canvas -&gt; preprocess
+        </text>
+        <text x={355} y={236} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={9}>
+          Cirq features + predict
+        </text>
+        <text x={355} y={252} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={9}>
+          show top probabilities
+        </text>
+
+        <line x1={282} y1={230} x2={298} y2={220} stroke="rgba(189, 255, 227, 0.8)" strokeWidth={1.6} markerEnd="url(#mnist-arrow-tip)" />
+        <line x1={282} y1={274} x2={298} y2={236} stroke="rgba(189, 255, 227, 0.8)" strokeWidth={1.6} markerEnd="url(#mnist-arrow-tip)" />
+      </svg>
+
+      <div className="rounded-xl border border-cosmic-300/40 bg-black/30 p-4">
+        <p className="text-xs uppercase tracking-[0.15em] text-nebula-100/88">Explain like I am 5</p>
+        <p className="mt-2 text-sm text-white/90">{current.name}</p>
+        <p className="mt-2 text-sm leading-7 text-white/84">{current.baby}</p>
+
+        <div className="mt-3 rounded-lg border border-aurora-300/40 bg-black/36 p-3 text-xs leading-6 text-aurora-100/88">
+          <p>Function call(s): {current.functions}</p>
+          <p className="mt-1">Input -&gt; output: {current.io}</p>
+        </div>
+
+        <div className="mt-3 grid gap-2 text-xs text-white/80">
+          <p className="rounded-lg border border-starlight-300/40 bg-starlight-500/14 px-3 py-2">
+            Defaults in script: --max-samples {SCRIPT_DEFAULTS.maxSamples}, --epochs {SCRIPT_DEFAULTS.epochs}, --batch-size {SCRIPT_DEFAULTS.batchSize}
+          </p>
+          <p className="rounded-lg border border-nebula-300/40 bg-nebula-500/14 px-3 py-2">
+            Quantum branch defaults: --n-qubits {SCRIPT_DEFAULTS.qubits}, --cirq-layers {SCRIPT_DEFAULTS.cirqLayers}
+          </p>
+          <p className="rounded-lg border border-solar-300/40 bg-solar-500/14 px-3 py-2 text-solar-100/92">
+            Target gate: --target-accuracy {SCRIPT_DEFAULTS.targetAccuracy}%
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OledScriptDiagram() {
+  const sample = { r: 184, g: 108, b: 231 };
+  const channels = [
+    {
+      key: "R",
+      value: sample.r,
+      tone: "border-cosmic-300/55 bg-cosmic-500/26 text-cosmic-50",
+    },
+    {
+      key: "G",
+      value: sample.g,
+      tone: "border-aurora-300/55 bg-aurora-500/24 text-aurora-50",
+    },
+    {
+      key: "B",
+      value: sample.b,
+      tone: "border-nebula-300/55 bg-nebula-500/26 text-nebula-50",
+    },
+  ] as const;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <svg viewBox="0 0 420 300" role="img" aria-label="oled.py workflow diagram" className="h-auto w-full">
+        <defs>
+          <marker id="oled-arrow-tip" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="rgba(189, 255, 227, 0.88)" />
+          </marker>
+        </defs>
+
+        <rect x={20} y={20} width={160} height={54} rx={12} fill="rgba(248, 155, 8, 0.28)" stroke="rgba(255, 227, 175, 0.86)" />
+        <text x={100} y={43} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          Image.open(path).convert("RGB")
+        </text>
+        <text x={100} y={60} textAnchor="middle" fill="rgba(247, 241, 255, 0.78)" fontSize={10}>
+          load full image array
+        </text>
+
+        <rect x={20} y={102} width={160} height={66} rx={12} fill="rgba(36, 203, 255, 0.24)" stroke="rgba(206, 245, 255, 0.86)" />
+        <text x={100} y={128} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          get_grid_samples(...)
+        </text>
+        <text x={100} y={146} textAnchor="middle" fill="rgba(247, 241, 255, 0.78)" fontSize={10}>
+          clamp + extract 10x10 window
+        </text>
+
+        <rect x={20} y={196} width={160} height={84} rx={12} fill="rgba(163, 88, 255, 0.3)" stroke="rgba(233, 204, 255, 0.86)" />
+        <text x={100} y={222} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          create_qubit_circuit(r,g,b)
+        </text>
+        <text x={100} y={240} textAnchor="middle" fill="rgba(247, 241, 255, 0.78)" fontSize={10}>
+          3 x RY angle encoding
+        </text>
+        <text x={100} y={258} textAnchor="middle" fill="rgba(247, 241, 255, 0.78)" fontSize={10}>
+          Statevector.from_instruction
+        </text>
+
+        <rect x={236} y={20} width={164} height={88} rx={12} fill="rgba(246, 32, 176, 0.24)" stroke="rgba(255, 210, 238, 0.86)" />
+        <text x={318} y={46} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          PixelInteractor
+        </text>
+        <text x={318} y={64} textAnchor="middle" fill="rgba(247, 241, 255, 0.78)" fontSize={10}>
+          drag full image grid
+        </text>
+        <text x={318} y={81} textAnchor="middle" fill="rgba(247, 241, 255, 0.78)" fontSize={10}>
+          click magnifier pixel
+        </text>
+        <text x={318} y={98} textAnchor="middle" fill="rgba(247, 241, 255, 0.78)" fontSize={10}>
+          update Bloch vectors
+        </text>
+
+        <rect x={236} y={132} width={164} height={148} rx={12} fill="rgba(40, 223, 157, 0.18)" stroke="rgba(189, 255, 227, 0.86)" />
+        <text x={318} y={156} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          Outputs
+        </text>
+        <text x={318} y={174} textAnchor="middle" fill="rgba(247, 241, 255, 0.8)" fontSize={10}>
+          matrix_states[10][10]
+        </text>
+        <text x={318} y={191} textAnchor="middle" fill="rgba(247, 241, 255, 0.8)" fontSize={10}>
+          matrix_binary[10][10]
+        </text>
+        <text x={318} y={208} textAnchor="middle" fill="rgba(247, 241, 255, 0.8)" fontSize={10}>
+          dominant basis probabilities
+        </text>
+        <text x={318} y={225} textAnchor="middle" fill="rgba(247, 241, 255, 0.8)" fontSize={10}>
+          formatted per-channel formulas
+        </text>
+        <text x={318} y={242} textAnchor="middle" fill="rgba(247, 241, 255, 0.8)" fontSize={10}>
+          save qubit_matrix.npy
+        </text>
+
+        <line x1={100} y1={74} x2={100} y2={102} stroke="rgba(189, 255, 227, 0.84)" strokeWidth={1.8} markerEnd="url(#oled-arrow-tip)" />
+        <line x1={100} y1={168} x2={100} y2={196} stroke="rgba(189, 255, 227, 0.84)" strokeWidth={1.8} markerEnd="url(#oled-arrow-tip)" />
+        <line x1={180} y1={228} x2={236} y2={74} stroke="rgba(189, 255, 227, 0.84)" strokeWidth={1.8} markerEnd="url(#oled-arrow-tip)" />
+        <line x1={180} y1={238} x2={236} y2={176} stroke="rgba(189, 255, 227, 0.84)" strokeWidth={1.8} markerEnd="url(#oled-arrow-tip)" />
+      </svg>
+
+      <div className="rounded-xl border border-cosmic-300/40 bg-black/30 p-4">
+        <p className="text-xs uppercase tracking-[0.15em] text-starlight-100/88">RGB encoding math (one pixel)</p>
+        <p className="mt-2 text-sm leading-7 text-white/84">
+          Each channel maps intensity to an angle with theta = (value / 255) * pi, then applies RY(theta) on one qubit.
+        </p>
+
+        <div className="mt-3 grid gap-2">
+          {channels.map((channel) => {
+            const thetaPi = channel.value / 255;
+            const thetaRad = thetaPi * Math.PI;
+
+            return (
+              <div key={channel.key} className={`rounded-lg border px-3 py-2 text-sm ${channel.tone}`}>
+                <div className="flex items-center justify-between">
+                  <span>{channel.key} = {channel.value}</span>
+                  <span>{thetaPi.toFixed(3)}pi</span>
+                </div>
+                <p className="mt-1 text-xs text-white/85">theta = {thetaRad.toFixed(3)} rad</p>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 rounded-lg border border-nebula-300/35 bg-black/38 p-3 text-xs leading-6 text-nebula-100/86">
+          <p>Interactive controls: drag the green sampling box, double-click to recenter, scroll zoom in the magnifier.</p>
+          <p className="mt-1">Display updates: pixel RGB, normalized values, basis probabilities, and 3 Bloch vectors.</p>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-cosmic-300/35 bg-cosmic-900/20 p-3 text-xs leading-6 text-white/84">
+          <p className="text-starlight-100/90">Baby-step file walkthrough:</p>
+          <div className="mt-2 grid gap-1.5">
+            {OLED_BABY_STEPS.map((step, index) => (
+              <p key={`oled-step-${index}`}>{index + 1}. {step}</p>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-aurora-300/35 bg-black/34 p-3 text-xs leading-6 text-aurora-100/88">
+          <p>Key methods in order: get_grid_samples() -&gt; create_qubit_circuit() -&gt; get_statevector() -&gt; PixelInteractor.resample_grid() -&gt; update_display().</p>
+          <p className="mt-1">Why this matters: every time you move or click, the script recomputes the local 10x10 quantum view so math and visuals stay synced.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuantumCoinTossDiagram({ tosses }: { tosses: number }) {
+  const totalTosses = Math.min(COIN_TOSS_MAX, Math.max(COIN_TOSS_MIN, Math.round(tosses)));
+
+  // Deterministic drift model: larger samples stay closer to a fair 50/50 split.
+  const driftAmplitude = 0.22 / Math.sqrt(totalTosses);
+  const driftSignal = Math.sin(totalTosses * 0.017) + Math.cos(totalTosses * 0.0031);
+  const headsProbability = Math.min(0.7, Math.max(0.3, 0.5 + driftAmplitude * driftSignal));
+
+  const heads = Math.round(totalTosses * headsProbability);
+  const tails = totalTosses - heads;
+
+  const headsPct = (heads / totalTosses) * 100;
+  const tailsPct = (tails / totalTosses) * 100;
+  const spread = Math.abs(headsPct - 50);
+
+  const wobble = Math.max(0.04, Math.min(0.2, 0.55 / Math.pow(totalTosses, 0.25)));
+  const convergence = Array.from({ length: 11 }, (_, i) => {
+    const progress = i / 10;
+    return 0.5 + (1 - progress) * wobble * Math.cos((i + 1) * 1.2 + totalTosses * 0.0016);
+  });
+  const convergencePath = toPath(convergence, 320, 180, 0.3, 0.7);
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+      <svg viewBox="0 0 420 300" role="img" aria-label="quantum coin toss workflow" className="h-auto w-full">
+        <defs>
+          <marker id="coin-arrow-tip" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="rgba(189, 255, 227, 0.88)" />
+          </marker>
+        </defs>
+
+        <rect x={22} y={28} width={122} height={56} rx={12} fill="rgba(248, 155, 8, 0.3)" stroke="rgba(255, 227, 175, 0.88)" />
+        <text x={83} y={52} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          Start |0&gt;
+        </text>
+        <text x={83} y={68} textAnchor="middle" fill="rgba(247, 241, 255, 0.8)" fontSize={10}>
+          qubit before toss
+        </text>
+
+        <rect x={164} y={28} width={124} height={56} rx={12} fill="rgba(163, 88, 255, 0.3)" stroke="rgba(233, 204, 255, 0.88)" />
+        <text x={226} y={52} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          Apply Hadamard H
+        </text>
+        <text x={226} y={68} textAnchor="middle" fill="rgba(247, 241, 255, 0.8)" fontSize={10}>
+          amplitudes 1/sqrt(2)
+        </text>
+
+        <rect x={308} y={28} width={92} height={56} rx={12} fill="rgba(36, 203, 255, 0.24)" stroke="rgba(206, 245, 255, 0.88)" />
+        <text x={354} y={52} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          Measure
+        </text>
+        <text x={354} y={68} textAnchor="middle" fill="rgba(247, 241, 255, 0.8)" fontSize={10}>
+          0 or 1
+        </text>
+
+        <rect x={34} y={118} width={350} height={62} rx={12} fill="rgba(246, 32, 176, 0.18)" stroke="rgba(255, 210, 238, 0.85)" />
+        <text x={209} y={143} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          toss_coin(): repeat measure_qubit() for n tosses
+        </text>
+        <text x={209} y={160} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={10}>
+          results list then Counter for heads and tails
+        </text>
+
+        <rect x={34} y={204} width={350} height={78} rx={12} fill="rgba(40, 223, 157, 0.16)" stroke="rgba(189, 255, 227, 0.86)" />
+        <text x={209} y={228} textAnchor="middle" fill="rgba(247, 241, 255, 0.95)" fontSize={11}>
+          plot_results() and plot_cumulative()
+        </text>
+        <text x={209} y={246} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={10}>
+          save coin_toss_results.png and coin_toss_convergence.png
+        </text>
+        <text x={209} y={263} textAnchor="middle" fill="rgba(247, 241, 255, 0.82)" fontSize={10}>
+          run sizes in main(): 100, 1024, 10000
+        </text>
+
+        <line x1={144} y1={56} x2={164} y2={56} stroke="rgba(189, 255, 227, 0.84)" strokeWidth={1.8} markerEnd="url(#coin-arrow-tip)" />
+        <line x1={288} y1={56} x2={308} y2={56} stroke="rgba(189, 255, 227, 0.84)" strokeWidth={1.8} markerEnd="url(#coin-arrow-tip)" />
+        <line x1={209} y1={84} x2={209} y2={118} stroke="rgba(189, 255, 227, 0.84)" strokeWidth={1.8} markerEnd="url(#coin-arrow-tip)" />
+        <line x1={209} y1={180} x2={209} y2={204} stroke="rgba(189, 255, 227, 0.84)" strokeWidth={1.8} markerEnd="url(#coin-arrow-tip)" />
+      </svg>
+
+      <div className="rounded-xl border border-cosmic-300/40 bg-black/30 p-4">
+        <p className="text-xs uppercase tracking-[0.15em] text-nebula-100/88">Sample run snapshot</p>
+        <p className="mt-2 text-sm text-white/86">n = {totalTosses.toLocaleString()} tosses from the script workflow.</p>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-starlight-300/45 bg-starlight-500/18 p-3">
+            <p className="text-xs text-starlight-100/88">Heads (0)</p>
+            <p className="mt-1 text-lg text-white">{heads.toLocaleString()}</p>
+            <p className="text-xs text-white/78">{headsPct.toFixed(1)}%</p>
+          </div>
+          <div className="rounded-lg border border-nebula-300/45 bg-nebula-500/18 p-3">
+            <p className="text-xs text-nebula-100/88">Tails (1)</p>
+            <p className="mt-1 text-lg text-white">{tails.toLocaleString()}</p>
+            <p className="text-xs text-white/78">{tailsPct.toFixed(1)}%</p>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-aurora-300/45 bg-black/36 p-3">
+          <div className="flex items-center justify-between text-xs text-white/78">
+            <span>Fair target</span>
+            <span>50% / 50%</span>
+          </div>
+          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-cosmic-950/70">
+            <div className="h-full bg-starlight-300/90" style={{ width: `${headsPct}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-aurora-100/88">Absolute drift from fair split: {spread.toFixed(1)}%</p>
+        </div>
+
+        <svg viewBox="0 0 320 180" role="img" aria-label="heads probability convergence" className="mt-3 h-auto w-full rounded-lg border border-cosmic-300/35 bg-black/35 p-2">
+          {[0, 1, 2, 3, 4].map((tick) => {
+            const y = 24 + (126 * tick) / 4;
+            return <line key={`coin-grid-${tick}`} x1={46} y1={y} x2={294} y2={y} stroke="rgba(228, 236, 255, 0.16)" />;
+          })}
+
+          <line x1={46} y1={24} x2={46} y2={150} stroke="rgba(231, 242, 255, 0.52)" />
+          <line x1={46} y1={150} x2={294} y2={150} stroke="rgba(231, 242, 255, 0.52)" />
+
+          <line x1={46} y1={87} x2={294} y2={87} stroke="rgba(189, 255, 227, 0.6)" strokeDasharray="4 4" />
+          <path d={convergencePath} fill="none" stroke="rgba(99, 219, 255, 0.95)" strokeWidth={2.5} />
+
+          <text x={52} y={16} fill="rgba(247, 242, 255, 0.86)" fontSize={10}>
+            Heads probability over tosses
+          </text>
+          <text x={214} y={83} fill="rgba(189, 255, 227, 0.9)" fontSize={9}>
+            expected 0.5
+          </text>
+        </svg>
+
+        <div className="mt-3 rounded-lg border border-nebula-300/35 bg-nebula-900/18 p-3 text-xs leading-6 text-white/84">
+          <p className="text-nebula-100/90">Baby-step file walkthrough:</p>
+          <div className="mt-2 grid gap-1.5">
+            {COIN_BABY_STEPS.map((step, index) => (
+              <p key={`coin-step-${index}`}>{index + 1}. {step}</p>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-aurora-300/35 bg-black/34 p-3 text-xs leading-6 text-aurora-100/88">
+          <p>Logic chain in plain words: make superposition -&gt; measure many times -&gt; count outcomes -&gt; visualize fairness and convergence.</p>
+          <p className="mt-1">Mapping used in this file: 0 means Heads, 1 means Tails.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function QbitSlideDeck() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [qubits, setQubits] = useState(4);
   const [depth, setDepth] = useState(3);
   const [epoch, setEpoch] = useState(5);
+  const [mnistStage, setMnistStage] = useState(0);
+  const [coinTosses, setCoinTosses] = useState(1024);
 
   const canPrev = activeSlide > 0;
   const canNext = activeSlide < SLIDES.length - 1;
@@ -713,7 +1231,7 @@ export default function QbitSlideDeck() {
             Visual Slides
           </p>
           <h2 className="mt-2 font-display text-2xl text-white md:text-3xl">
-            Quantum MNIST Diagram Deck
+            Quantum Script Diagram Deck
           </h2>
         </div>
 
@@ -744,7 +1262,9 @@ export default function QbitSlideDeck() {
             type="button"
             onClick={() => setActiveSlide(index)}
             className={`rounded-full border px-4 py-1.5 text-xs tracking-wide transition ${
-              index === activeSlide ? SLIDE_ACCENTS[index].active : SLIDE_ACCENTS[index].inactive
+              index === activeSlide
+                ? SLIDE_ACCENTS[index % SLIDE_ACCENTS.length].active
+                : SLIDE_ACCENTS[index % SLIDE_ACCENTS.length].inactive
             }`}
           >
             {index + 1}. {slide.title}
@@ -771,7 +1291,7 @@ export default function QbitSlideDeck() {
         <p className="mt-2 text-sm leading-7 text-white/86 md:text-base">{active.subtitle}</p>
 
         <div
-          className={`relative mt-5 overflow-x-auto rounded-xl border border-cosmic-300/35 p-3 md:p-4 ${SLIDE_CANVAS_ACCENTS[activeSlide]}`}
+          className={`relative mt-5 overflow-x-auto rounded-xl border border-cosmic-300/35 p-3 md:p-4 ${SLIDE_CANVAS_ACCENTS[activeSlide % SLIDE_CANVAS_ACCENTS.length]}`}
         >
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute left-4 top-4 h-2.5 w-2.5 rounded-full bg-cosmic-200/85" />
@@ -784,6 +1304,9 @@ export default function QbitSlideDeck() {
             {activeSlide === 1 && <GateDiagram />}
             {activeSlide === 2 && <QuantumLayerDiagram qubits={qubits} depth={depth} />}
             {activeSlide === 3 && <HybridGraphDiagram epoch={epoch} />}
+            {activeSlide === 4 && <TensorflowCirqPipelineDiagram stage={mnistStage} />}
+            {activeSlide === 5 && <OledScriptDiagram />}
+            {activeSlide === 6 && <QuantumCoinTossDiagram tosses={coinTosses} />}
           </div>
         </div>
 
@@ -828,6 +1351,55 @@ export default function QbitSlideDeck() {
                 className="mt-2 w-full accent-aurora-300"
               />
             </label>
+          </div>
+        )}
+
+        {activeSlide === 4 && (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <label className="rounded-xl border border-nebula-400/40 bg-black/25 p-3">
+              <span className="text-sm text-white/88">
+                Pipeline Step: {mnistStage + 1} / {MNIST_PIPELINE_STEPS.length}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={MNIST_PIPELINE_STEPS.length - 1}
+                step={1}
+                value={mnistStage}
+                onChange={(event) => setMnistStage(Number(event.target.value))}
+                className="mt-2 w-full accent-nebula-300"
+              />
+              <p className="mt-2 text-xs text-white/72">{MNIST_PIPELINE_STEPS[mnistStage].name}</p>
+            </label>
+
+            <div className="rounded-xl border border-cosmic-400/40 bg-black/25 p-3 text-xs leading-6 text-white/80">
+              <p>Mode flow: train -&gt; save model/artifacts -&gt; draw mode inference.</p>
+              <p className="mt-1">At predict time, the drawing uses the same PCA/scaler and Cirq extractor from training artifacts.</p>
+            </div>
+          </div>
+        )}
+
+        {activeSlide === 6 && (
+          <div className="mt-4 rounded-xl border border-nebula-400/40 bg-black/25 p-3">
+            <label>
+              <span className="text-sm text-white/88">
+                Coin Toss Sample Size: {coinTosses.toLocaleString()}
+              </span>
+              <input
+                type="range"
+                min={COIN_TOSS_MIN}
+                max={COIN_TOSS_MAX}
+                step={1}
+                value={coinTosses}
+                onChange={(event) => setCoinTosses(Number(event.target.value))}
+                className="mt-2 w-full accent-nebula-300"
+              />
+            </label>
+            <div className="mt-2 flex items-center justify-between text-xs text-white/65">
+              <span>{COIN_TOSS_MIN.toLocaleString()}</span>
+              <span>{Math.round((COIN_TOSS_MIN + COIN_TOSS_MAX) / 2).toLocaleString()}</span>
+              <span>{COIN_TOSS_MAX.toLocaleString()}</span>
+            </div>
           </div>
         )}
       </div>

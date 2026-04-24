@@ -568,7 +568,7 @@ def parse_args():
     parser.add_argument("--batch-size", type=int, default=128, help="Mini-batch size.")
     parser.add_argument("--learning-rate", type=float, default=0.001, help="Learning rate.")
 
-    parser.add_argument("--n-qubits", type=int, default=15, help="Number of qubits for Cirq feature branch.")
+    parser.add_argument("--n-qubits", type=int, default=10, help="Number of qubits for Cirq feature branch.")
     parser.add_argument("--cirq-layers", type=int, default=4, help="Number of Cirq encoding layers.")
 
     parser.add_argument(

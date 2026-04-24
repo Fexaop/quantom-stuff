@@ -19,8 +19,8 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Pastel Cosmic Qubits",
-  description: "A small pastel cosmic landing page introducing qubits vs bits.",
+  title: "Cosmic Qubits",
+  description: "introducing qubits vs bits.",
 };
 
 export default function RootLayout({
